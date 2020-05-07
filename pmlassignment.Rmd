@@ -1,0 +1,68 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Andy Wu"
+date: "5/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(rpart)
+```
+
+# Practical Machine Learning Assignment: Predicting the exercise type!
+
+In this brief, I go through 3 practical steps for determining the model data. In the first step I will download and clean the data, in the second step I'll fit a few different models, and the 3rd step I will test the models on the data set.
+
+##Getting and Cleaning Data
+
+In the R code below, I will download the files and perform some exploratory data analysis. Based on the initial data, in the project we 
+
+```{r gettingandcleaningdata}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml-training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml-testing.csv")
+trainingdata <- read.csv("pml-training.csv", na.string = c("NA", "#DIV/0!"))
+testingdata <- read.csv("pml-testing.csv", na.string = c("NA", "#DIV/0!"))
+str(trainingdata); str(testingdata)
+totalNA <- sapply(1:length(trainingdata), function(x) sum(is.na(trainingdata[,x]))) #if you look at totalNa you notice that some variables are completely missing data
+NAindice <- which(totalNA >0) #this gives you all the indicies of every column that has no data
+cleantraining <- trainingdata[,-NAindice] #this removes variables with no data
+cleantraining <- cleantraining[,-c(1:7)] # this removes identification variables which I will not use in the data analysis
+cleantesting <- testingdata[,-NAindice]
+cleantesting <- cleantesting[,-c(1:7)]
+validIndex <- createDataPartition(cleantraining$classe, p = .70, list = FALSE)
+testtraining <- cleantraining[validIndex,]
+validtraining <- cleantraining[-validIndex,]
+```
+
+In the cleaning data above, I've gone ahead and removed alot of the NA's that were in my data. In the first interation of the clean, I actually noticed the variable #DIV/0! and had to go back and convert this data to NA so my code could remove all of the NA's together. After identifying the total NA's I realized that the variables that had NA had over 98% of those variables as NA therefore they were removed as a predictor. After the clean, the new clean dataset had only 53 predictors.
+
+## Model Fitting Process
+
+During this process, tried 3 different models without really classifying the relationships. The first model I tested was the GLM model and it returned in accurate errors therefore I knew the data was not linearly related. The 2nd model I tried was the random forest and it came out with a very high accuracy rate of 99% and a 9.9% out of sample error rate when tested on the validation set. The 3rd model I tried was the recursive partitioning and regression trees and model only predicts at an accuracy rate of 50% and out of sample error of 34%. Since the random forest model was extremely accurate I decided we did not have to blend the models together.
+
+```{r modelfitting process}
+set.seed(1688) #make sure to set the randomness before ever training model for reproducibility
+fitControl <- trainControl(method = "repeatedcv",number = 3,repeats = 2) #this breaks down the training set into 10 K fold partitions for cross validataion.
+##fitglm <- train(classe~., data = testtraining, method = "glm", trControl = fitControl)
+fitrf <- train(classe~., data = testtraining, method = "rf", trControl = fitControl)
+predrf <- predict(fitrf, newdata = validtraining)
+confusionMatrix(predrf,validtraining$classe)
+fitrpart <- train(classe~., data = testtraining, method = "rpart", trControl = fitControl)
+predrpart <- predict(fitrpart, newdata = validtraining)
+confusionMatrix(predrpart,validtraining$classe)
+```
+## Predicting
+
+In the r code below I've gone ahead and inputted the testing data with 20 samples to see what the prediction variables are using the random forest model generated in the previous section. Based on the print out of the predictor test, the predictions are:  B A B A A E D B A A B C B A E E A B B B.
+
+```{r prediction process}
+predtest <- predict(fitrf, newdata = cleantesting)
+length(predtest)
+print(predtest)
+```
+
+## Conclusion
+
+In conclusion the best model is the random forest model set and it worked for my validation set quite accurately. 
